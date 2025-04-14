@@ -1,0 +1,33 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+env:
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKERHUB_KEY: ${{ secrets.DOCKER_KEY }}
+  IMAGE_NAME: detector
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_KEY }}
+
+      - name: Build Docker image
+        run: cd ./helloworld && podman build -t ${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }} -f deploy/Dockerfile .
+
+      - name: Push Docker image
+        run: podman push ${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}

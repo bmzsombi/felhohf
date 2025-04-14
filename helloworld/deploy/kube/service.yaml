@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: detector-service
+  namespace: detector
+  labels:
+    app: detector
+spec:
+  selector:
+    app: detector
+  type: LoadBalancer
+  ports:
+  - name: http-port
+    port: 80
+    protocol: TCP
+    targetPort: 8443
