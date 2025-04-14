@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: detector
-  namespace: detector
+  #namespace: detector
   labels:
     app: detector
 spec:
