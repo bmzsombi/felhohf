@@ -27,3 +27,9 @@ spec:
               memory: "100Mi"
           ports:
             - containerPort: 8443
+          volumeMounts:
+          - mountPath: /mnt/data
+            name: detector-pvc
+        - name: detector-pvc
+          persistentVolumeClaim:
+            claimName: detector-pvc
