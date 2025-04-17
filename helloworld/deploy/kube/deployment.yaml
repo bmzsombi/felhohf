@@ -30,6 +30,7 @@ spec:
           volumeMounts:
           - mountPath: /mnt/data
             name: detector-pvc
+      volumes:
         - name: detector-pvc
           persistentVolumeClaim:
             claimName: detector-pvc

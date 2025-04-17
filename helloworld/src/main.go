@@ -7,10 +7,8 @@ import (
 )
 
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "static/index.html")
-	})
 	http.HandleFunc("/", uploadFile)
+	//http.HandleFunc("/", uploadFile)
 	http.ListenAndServe(":8443", nil)
 }
 
