@@ -11,6 +11,7 @@ import (
 func main() {
 	http.HandleFunc("/", uploadFile)
 	http.HandleFunc("/lists", listFiles)
+	http.HandleFunc("/lists/", displayImage)
 	http.ListenAndServe(":8443", nil)
 }
 
@@ -52,7 +53,6 @@ func listFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// HTML sablon betöltése a lists.html fájlból
 	tmpl, err := template.ParseFiles("static/lists.html")
 	if err != nil {
 		http.Error(w, "Unable to parse template", http.StatusInternalServerError)
@@ -64,4 +64,11 @@ func listFiles(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to execute template", http.StatusInternalServerError)
 		return
 	}
+}
+
+func displayImage(w http.ResponseWriter, r *http.Request) {
+	filename := r.URL.Path[len("/lists/"):] // Kivágjuk a fájlnevet az URL-ből
+	filepath := filepath.Join("/mnt/data", filename)
+
+	http.ServeFile(w, r, filepath) // A fájl kiszolgálása
 }
