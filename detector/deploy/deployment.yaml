@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detector-yolo
+  #namespace: detector
+  labels:
+    app: detector-yolo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: detector-yolo
+  template:
+    metadata:
+      labels:
+        app: detector-yolo
+    spec:
+      containers:
+        - name: detector-yolo
+          image: docker.io/ultralytics/yolov5:latest
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "100Mi"
+            limits:
+              cpu: "500m"
+              memory: "500Mi"
+          ports:
+            - containerPort: 22
+          volumeMounts:
+          - mountPath: /mnt/data
+            name: detector-pvc
+      volumes:
+        - name: detector-pvc
+          persistentVolumeClaim:
+            claimName: detector-pvc
