@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"text/template"
 )
 
 func main() {
 	http.HandleFunc("/", uploadFile)
-	//http.HandleFunc("/", uploadFile)
+	http.HandleFunc("/lists", listFiles)
 	http.ListenAndServe(":8443", nil)
 }
 
@@ -41,5 +42,26 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("File uploaded successfully!"))
 	} else {
 		http.ServeFile(w, r, "static/index.html")
+	}
+}
+
+func listFiles(w http.ResponseWriter, r *http.Request) {
+	files, err := os.ReadDir("/mnt/data")
+	if err != nil {
+		http.Error(w, "Unable to read directory", http.StatusInternalServerError)
+		return
+	}
+
+	// HTML sablon betöltése a lists.html fájlból
+	tmpl, err := template.ParseFiles("static/lists.html")
+	if err != nil {
+		http.Error(w, "Unable to parse template", http.StatusInternalServerError)
+		return
+	}
+
+	err = tmpl.Execute(w, files)
+	if err != nil {
+		http.Error(w, "Unable to execute template", http.StatusInternalServerError)
+		return
 	}
 }
