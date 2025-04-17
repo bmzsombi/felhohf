@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -14,15 +15,16 @@ func main() {
 
 func uploadFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
-		file, _, err := r.FormFile("file")
+		file, header, err := r.FormFile("file")
 		if err != nil {
 			http.Error(w, "Unable to get file", http.StatusBadRequest)
 			return
 		}
 		defer file.Close()
 
+		filepath := filepath.Join("/mnt/data", header.Filename)
 		// Create a new file in the PVC mount point
-		out, err := os.Create("/mnt/data/uploaded_file") // A PVC mount point
+		out, err := os.Create(filepath) // A PVC mount point
 		if err != nil {
 			http.Error(w, "Unable to create file", http.StatusInternalServerError)
 			return
