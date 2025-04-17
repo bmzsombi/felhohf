@@ -5,6 +5,9 @@
     <title>Helloworld</title>
 </head>
 <body>
-    <p>Helloworld!</p>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" id="file">
+        <button type="submit">Fájl feltöltése</button>
+    </form>
 </body>
 </html>
