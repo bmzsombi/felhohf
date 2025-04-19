@@ -10,4 +10,4 @@ spec:
   hostPath:
     path: /mnt/data
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: "detector-storageclass" 
+  storageClassName: "detector-storageclass"

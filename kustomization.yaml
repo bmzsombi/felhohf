@@ -1,9 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ./helloworld/deploy/pv.yaml
-  - ./helloworld/deploy/pvc.yaml
-  - ./helloworld/deploy/deployment.yaml
-  - ./helloworld/deploy/service.yaml
+  - ./helloworld/deploy/kube/pv.yaml
+  - ./helloworld/deploy/kube/pvc.yaml
+  - ./helloworld/deploy/kube/deployment.yaml
+  - ./helloworld/deploy/kube/service.yaml
   - ./detector/deploy/deployment.yaml
   - ./detector/deploy/service.yaml
