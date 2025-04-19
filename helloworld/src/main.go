@@ -20,6 +20,7 @@ func main() {
 	http.HandleFunc("/", uploadFile)
 	http.HandleFunc("/lists", listFiles)
 	http.HandleFunc("/lists/", displayImage)
+	http.HandleFunc("/files/", serveFile)
 
 	// Swagger UI
 	http.Handle("/swagger/", httpSwagger.WrapHandler)
@@ -102,7 +103,7 @@ func listFiles(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {string} string "Internal server error"
 // @Router /lists/{filename} [get]
 func displayImage(w http.ResponseWriter, r *http.Request) {
-	filename := r.URL.Path[len("/lists/"):] // Kivágjuk a fájlnevet az URL-ből
+	filename := r.URL.Path[len("/lists/"):]
 	filepath := filepath.Join("/mnt/data", filename)
 	if _, err := os.Stat(filepath); os.IsNotExist(err) {
 		http.Error(w, "File not found", http.StatusNotFound)
@@ -120,13 +121,30 @@ func displayImage(w http.ResponseWriter, r *http.Request) {
 	<body>
 	    <a href="/lists" style="text-decoration: none; color: blue; font-size: 16px;">Vissza a listához</a>
 	    <h1>` + filename + ` - Kép</h1>
-	    <img src="/mnt/data/` + filename + `" alt="` + filename + ` kép">
+	    <img src="/files/` + filename + `" alt="` + filename + ` kép">
 	</body>
 	</html>
 	`
 
-	//http.ServeFile(w, r, filepath) // A fájl kiszolgálása
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(html))
-	//http.ServeFile(w, r, filepath)
+}
+
+// @Summary Serve File
+// @Description Serves the actual file content.
+// @Param filename path string true "The name of the file"
+// @Produce octet-stream
+// @Success 200 {file} file "The requested file"
+// @Failure 404 {string} string "File not found"
+// @Router /files/{filename} [get]
+func serveFile(w http.ResponseWriter, r *http.Request) {
+	filename := r.URL.Path[len("/files/"):]
+	path := filepath.Join("/mnt/data", filename)
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	http.ServeFile(w, r, path)
 }
