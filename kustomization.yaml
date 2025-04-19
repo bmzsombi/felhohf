@@ -5,5 +5,5 @@ resources:
   - ./helloworld/deploy/kube/pvc.yaml
   - ./helloworld/deploy/kube/deployment.yaml
   - ./helloworld/deploy/kube/service.yaml
-  - ./detector/deploy/deployment.yaml
-  - ./detector/deploy/service.yaml
+  # - ./detector/deploy/deployment.yaml
+  # - ./detector/deploy/service.yaml
