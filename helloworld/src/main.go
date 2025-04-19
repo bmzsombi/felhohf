@@ -120,7 +120,7 @@ func displayImage(w http.ResponseWriter, r *http.Request) {
 	<body>
 	    <a href="/lists" style="text-decoration: none; color: blue; font-size: 16px;">Vissza a listához</a>
 	    <h1>` + filename + ` - Kép</h1>
-	    <img src="/lists/` + filename + `" alt="` + filename + ` kép">
+	    <img src="/mnt/data/` + filename + `" alt="` + filename + ` kép">
 	</body>
 	</html>
 	`
@@ -128,5 +128,5 @@ func displayImage(w http.ResponseWriter, r *http.Request) {
 	//http.ServeFile(w, r, filepath) // A fájl kiszolgálása
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(html))
-	http.ServeFile(w, r, filepath)
+	//http.ServeFile(w, r, filepath)
 }
