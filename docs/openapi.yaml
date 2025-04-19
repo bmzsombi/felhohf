@@ -1,0 +1,81 @@
+openapi: 3.1.0
+info:
+  title: File Upload API
+  description: API for uploading and listing files
+  version: 1.0.0
+servers:
+  - url: http://localhost:8443
+paths:
+  /:
+    get:
+      summary: Upload File Page
+      description: Serves the HTML page for file upload.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            text/html:
+              schema:
+                type: string
+    post:
+      summary: Upload a File
+      description: Uploads a file to the server.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+
+  /lists:
+    get:
+      summary: List Files
+      description: Returns a list of uploaded files.
+      responses:
+        '200':
+          description: A list of files
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal server error
+
+  /lists/{filename}:
+    get:
+      summary: Display Image
+      description: Serves the requested image file.
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: The name of the file to display
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The requested file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: File not found
+        '500':
+          description: Internal server error

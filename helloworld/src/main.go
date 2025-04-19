@@ -1,3 +1,8 @@
+// @title File Upload API
+// @version 1.0
+// @description API for uploading and listing files
+// @host localhost:8443
+// @BasePath /
 package main
 
 import (
@@ -6,15 +11,32 @@ import (
 	"os"
 	"path/filepath"
 	"text/template"
+
+	_ "helloworld/docs" // Import the generated swagger docs
+	"github.com/swaggo/http-swagger"
 )
+
 
 func main() {
 	http.HandleFunc("/", uploadFile)
 	http.HandleFunc("/lists", listFiles)
 	http.HandleFunc("/lists/", displayImage)
+
+	// Swagger UI
+	http.Handle("/swagger/", httpSwagger.WrapHandler)
+
 	http.ListenAndServe(":8443", nil)
 }
 
+// @Summary Upload a File
+// @Description Uploads a file to the server.
+// @Accept multipart/form-data
+// @Produce plain
+// @Param file formData file true "File to upload"
+// @Success 200 {string} string "File uploaded successfully"
+// @Failure 400 {string} string "Bad request"
+// @Failure 500 {string} string "Internal server error"
+// @Router / [post]
 func uploadFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		file, header, err := r.FormFile("file")
@@ -46,6 +68,12 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// @Summary List Files
+// @Description Returns a list of uploaded files.
+// @Produce html
+// @Success 200 {string} string "A list of files"
+// @Failure 500 {string} string "Internal server error"
+// @Router /lists [get]
 func listFiles(w http.ResponseWriter, r *http.Request) {
 	files, err := os.ReadDir("/mnt/data")
 	if err != nil {
@@ -66,6 +94,14 @@ func listFiles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// @Summary Display Image
+// @Description Serves the requested image file.
+// @Param filename path string true "The name of the file to display"
+// @Produce octet-stream
+// @Success 200 {file} file "The requested file"
+// @Failure 404 {string} string "File not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router /lists/{filename} [get]
 func displayImage(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Path[len("/lists/"):] // Kivágjuk a fájlnevet az URL-ből
 	filepath := filepath.Join("/mnt/data", filename)
