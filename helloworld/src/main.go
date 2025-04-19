@@ -127,5 +127,5 @@ func displayImage(w http.ResponseWriter, r *http.Request) {
 
 	//http.ServeFile(w, r, filepath) // A fájl kiszolgálása
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(templateHTML))
+	w.Write([]byte(html))
 }
