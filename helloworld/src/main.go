@@ -16,22 +16,6 @@ import (
 	"github.com/swaggo/http-swagger"
 )
 
-const templateHTML = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.Name}} - Kép</title>
-</head>
-<body>
-    <a href="/lists" style="text-decoration: none; color: blue; font-size: 16px;">Vissza a listához</a>
-    <h1>{{.Name}} - Kép</h1>
-    <img src="/path/to/image/{{.Name}}" alt="{{.Name}} kép">
-</body>
-</html>
-`
-
 func main() {
 	http.HandleFunc("/", uploadFile)
 	http.HandleFunc("/lists", listFiles)
@@ -124,6 +108,22 @@ func displayImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}
+
+	html := `
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+	    <meta charset="UTF-8">
+	    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	    <title>` + filename + ` - Kép</title>
+	</head>
+	<body>
+	    <a href="/lists" style="text-decoration: none; color: blue; font-size: 16px;">Vissza a listához</a>
+	    <h1>` + filename + ` - Kép</h1>
+	    <img src="/lists/` + filename + `" alt="` + filename + ` kép">
+	</body>
+	</html>
+	`
 
 	//http.ServeFile(w, r, filepath) // A fájl kiszolgálása
 	w.Header().Set("Content-Type", "text/html")
