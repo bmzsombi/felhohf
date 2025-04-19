@@ -1,0 +1,76 @@
+basePath: /
+host: localhost:8443
+info:
+  contact: {}
+  description: API for uploading and listing files
+  title: File Upload API
+  version: "1.0"
+paths:
+  /:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Uploads a file to the server.
+      parameters:
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: File uploaded successfully
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Upload a File
+  /lists:
+    get:
+      description: Returns a list of uploaded files.
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: A list of files
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: List Files
+  /lists/{filename}:
+    get:
+      description: Serves the requested image file.
+      parameters:
+      - description: The name of the file to display
+        in: path
+        name: filename
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: The requested file
+          schema:
+            type: file
+        "404":
+          description: File not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Display Image
+swagger: "2.0"
