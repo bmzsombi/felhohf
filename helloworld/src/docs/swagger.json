@@ -50,6 +50,38 @@
                 }
             }
         },
+        "/files/{filename}": {
+            "get": {
+                "description": "Serves the actual file content.",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "summary": "Serve File",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "The name of the file",
+                        "name": "filename",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The requested file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "File not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/lists": {
             "get": {
                 "description": "Returns a list of uploaded files.",

@@ -33,6 +33,27 @@ paths:
           schema:
             type: string
       summary: Upload a File
+  /files/{filename}:
+    get:
+      description: Serves the actual file content.
+      parameters:
+      - description: The name of the file
+        in: path
+        name: filename
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: The requested file
+          schema:
+            type: file
+        "404":
+          description: File not found
+          schema:
+            type: string
+      summary: Serve File
   /lists:
     get:
       description: Returns a list of uploaded files.
