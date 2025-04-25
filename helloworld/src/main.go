@@ -71,7 +71,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 
 		w.Write([]byte("File uploaded successfully!"))
 	} else {
-		http.ServeFile(w, r, "static/index.html")
+		http.ServeFile(w, r, "static/login.html")
 	}
 }
 
