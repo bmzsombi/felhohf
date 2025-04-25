@@ -44,7 +44,7 @@
       const resultDiv = document.getElementById("result");
 
       if (res.ok) {
-        window.location.href = "/static/index.html";
+        window.location.href = "/static/login.html";
       } else {
         const text = await res.text();
         resultDiv.innerText = "Hiba: " + text;
