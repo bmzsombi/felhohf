@@ -1,4 +1,4 @@
-<html lang="en">
+<html lang="hu">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,28 +12,6 @@
     </form>
     <br>
 
-    <script>
-        // Ha nincs token, irányítsuk át a login oldalra
-        if (!localStorage.getItem("token")) {
-          window.location.href = "/static/login.html";
-        } else {
-          // Kiolvassuk a JWT-ből a felhasználónevet
-          const token = localStorage.getItem("token");
-          const base64Url = token.split('.')[1];
-          const base64 = base64Url.replace('-', '+').replace('_', '/');
-          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-          }).join(''));
     
-          const user = JSON.parse(jsonPayload).username;
-          document.getElementById("username").textContent = user;
-        }
-    
-        // Kijelentkezés
-        document.getElementById("logout-btn").addEventListener("click", function() {
-          localStorage.removeItem("token");
-          window.location.href = "/static/login.html";
-        });
-      </script>
 </body>
 </html>
