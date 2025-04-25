@@ -12,15 +12,21 @@ import (
 	"path/filepath"
 	"text/template"
 
+	auth "helloworld/db"
 	_ "helloworld/docs" // Import the generated swagger docs
-	"github.com/swaggo/http-swagger"
+
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func main() {
+	auth.InitDB()
+
 	http.HandleFunc("/", uploadFile)
 	http.HandleFunc("/lists", listFiles)
 	http.HandleFunc("/lists/", displayImage)
 	http.HandleFunc("/files/", serveFile)
+	http.HandleFunc("/register", auth.RegisterHandler)
+	http.HandleFunc("/login", auth.LoginHandler)
 
 	// Swagger UI
 	http.Handle("/swagger/", httpSwagger.WrapHandler)
