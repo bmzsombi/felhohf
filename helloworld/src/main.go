@@ -54,15 +54,13 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 		defer file.Close()
 
 		filepath := filepath.Join("/mnt/data", header.Filename)
-		// Create a new file in the PVC mount point
-		out, err := os.Create(filepath) // A PVC mount point
+		out, err := os.Create(filepath)
 		if err != nil {
 			http.Error(w, "Unable to create file", http.StatusInternalServerError)
 			return
 		}
 		defer out.Close()
 
-		// Copy the uploaded file to the new file
 		_, err = io.Copy(out, file)
 		if err != nil {
 			http.Error(w, "Unable to save file", http.StatusInternalServerError)

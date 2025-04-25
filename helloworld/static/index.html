@@ -11,7 +11,13 @@
         <button type="submit">Fájl feltöltése</button>
     </form>
     <br>
-
+    <script>
+        // Ellenőrizzük, hogy van-e érvényes token
+        if (!localStorage.getItem("token")) {
+          // Ha nincs token, átirányítjuk a login oldalra
+          window.location.href = "/static/login.html";
+        }
+    </script>
     
 </body>
 </html>

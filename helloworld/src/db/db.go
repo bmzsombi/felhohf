@@ -17,7 +17,6 @@ func InitDB() {
 		log.Fatal(err)
 	}
 
-	// Create table if not exists
 	_, err = DB.Exec(`
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
