@@ -1,0 +1,8 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta1
+kind: Kustomization
+resources:
+  - pv.yaml
+  - pvc.yaml
+  - postgres.yaml
+  - deployment.yaml
+  - service.yaml
