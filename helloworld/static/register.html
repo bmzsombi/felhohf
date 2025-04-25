@@ -44,6 +44,8 @@
       const resultDiv = document.getElementById("result");
 
       if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("token", data.token);
         window.location.href = "/static/login.html";
       } else {
         const text = await res.text();
