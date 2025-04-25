@@ -27,6 +27,7 @@ func main() {
 	http.HandleFunc("/files/", serveFile)
 	http.HandleFunc("/register", auth.RegisterHandler)
 	http.HandleFunc("/login", auth.LoginHandler)
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	// Swagger UI
 	http.Handle("/swagger/", httpSwagger.WrapHandler)
