@@ -1,7 +1,7 @@
 FROM golang:latest AS build
 
 COPY src/ /
-WORKDIR /
+WORKDIR /src
 
 # RUN go mod tidy
 RUN go mod download
