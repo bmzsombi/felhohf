@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	kafka "github.com/segmentio/kafka-go"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
 const (
@@ -16,20 +16,27 @@ const (
 )
 
 type MyKafka struct {
-	kafkaProducer *kafka.Writer
-	kafkaConsumer *kafka.Reader
+	kafkaProducer *kafka.Producer
+	kafkaConsumer *kafka.Consumer
 	uploadTopic   string
 	consumerGroup string
 	wg            sync.WaitGroup
 }
 
+var uploadTopic = imageUploadTopic
+
 func (mk *MyKafka) InitProducer() error {
-	mk.kafkaProducer = &kafka.Writer{
-		Addr:      kafka.TCP(kafkaBrokerAddress),
-		Topic:     imageUploadTopic,
-		Balancer:  &kafka.RoundRobin{},
-		Transport: &kafka.Transport{}, // Explicit transport initialization
+	configMap := &kafka.ConfigMap{
+		"bootstrap.servers": kafkaBrokerAddress,
+		// További producer konfigurációk itt megadhatók
 	}
+
+	producer, err := kafka.NewProducer(configMap)
+	if err != nil {
+		log.Printf("Nem sikerült létrehozni a Kafka producert: %v", err)
+		return err
+	}
+	mk.kafkaProducer = producer
 	log.Println("Kafka producer inicializálva")
 	return nil
 }
@@ -41,15 +48,36 @@ func (mk *MyKafka) SendMessage(ctx context.Context, key, value []byte) error {
 		}
 	}
 
-	message := kafka.Message{
-		Key:   key,
-		Value: value,
+	deliveryChan := make(chan kafka.Event)
+	defer close(deliveryChan)
+
+	message := &kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &uploadTopic, Partition: kafka.PartitionAny},
+		Key:            key,
+		Value:          value,
 	}
 
-	err := mk.kafkaProducer.WriteMessages(ctx, message)
+	err := mk.kafkaProducer.Produce(message, deliveryChan)
 	if err != nil {
-		log.Printf("Hiba az üzenet küldésekor a Kafka-ba: %+v", err)
+		log.Printf("Hiba az üzenet küldésekor a Kafka-ba: %v", err)
 		return err
+	}
+
+	// Várakozás a kézbesítési jelentésre
+	e := <-deliveryChan
+	switch ev := e.(type) {
+	case *kafka.Message:
+		if ev.TopicPartition.Error != nil {
+			log.Printf("Üzenet kézbesítési hiba: %v\n", ev.TopicPartition.Error)
+			return ev.TopicPartition.Error
+		} else {
+			// Sikeres kézbesítés esetén (opcionális logolás)
+			// log.Printf("Üzenet sikeresen kézbesítve a %s [%d] @ %v címre\n",
+			// 	*ev.TopicPartition.Topic, ev.TopicPartition.Partition, ev.TopicPartition.Offset)
+		}
+	case kafka.Error:
+		log.Printf("Kafka hiba: %v\n", ev)
+		return ev
 	}
 
 	return nil
@@ -57,11 +85,8 @@ func (mk *MyKafka) SendMessage(ctx context.Context, key, value []byte) error {
 
 func (mk *MyKafka) CloseProducerCloseConsumer() {
 	if mk.kafkaProducer != nil {
-		if err := mk.kafkaProducer.Close(); err != nil {
-			log.Printf("Hiba a Kafka producer lezárásakor: %v", err)
-		} else {
-			log.Println("Kafka producer lezárva")
-		}
+		mk.kafkaProducer.Close()
+		log.Println("Kafka producer lezárva")
 	}
 	if mk.kafkaConsumer != nil {
 		if err := mk.kafkaConsumer.Close(); err != nil {
@@ -78,19 +103,29 @@ func (mk *MyKafka) InitConsumer() error {
 		return nil
 	}
 
-	dialer := &kafka.Dialer{
-		Timeout:   30 * time.Second, // Példa timeout
-		DualStack: true,
-		// Itt lehet további dialer beállításokat megadni, ha szükséges
+	configMap := &kafka.ConfigMap{
+		"bootstrap.servers": kafkaBrokerAddress,
+		"group.id":          consumerGroupID,
+		"auto.offset.reset": "earliest", // vagy "latest", "none"
+		// További consumer konfigurációk itt megadhatók
 	}
 
-	mk.kafkaConsumer = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     []string{kafkaBrokerAddress},
-		GroupID:     consumerGroupID,
-		Topic:       imageUploadTopic,
-		StartOffset: kafka.FirstOffset, // Honnan kezdje olvasni
-		Dialer:      dialer,
-	})
+	consumer, err := kafka.NewConsumer(configMap)
+	if err != nil {
+		log.Printf("Nem sikerült létrehozni a Kafka consumert: %v", err)
+		return err
+	}
+
+	err = consumer.SubscribeTopics([]string{imageUploadTopic}, nil)
+	if err != nil {
+		log.Printf("Nem sikerült feliratkozni a témára: %v", err)
+		if closeErr := consumer.Close(); closeErr != nil {
+			log.Printf("Hiba a consumer lezárásakor a feliratkozási hiba után: %v", closeErr)
+		}
+		return err
+	}
+
+	mk.kafkaConsumer = consumer
 	mk.consumerGroup = consumerGroupID
 
 	log.Println("Kafka consumer inicializálva")
@@ -114,40 +149,61 @@ func (mk *MyKafka) ConsumeMessages(ctx context.Context, messageHandler func(key,
 			log.Println("ConsumeMessages leállítva a kontextus miatt.")
 			return
 		default:
-			msg, err := mk.kafkaConsumer.ReadMessage(ctx)
+			msg, err := mk.kafkaConsumer.ReadMessage(time.Second) // Hozzáadtam egy timeout-ot
 			if err != nil {
-				if err == context.Canceled {
-					return
+				if kerr, ok := err.(kafka.Error); ok && kerr.Code() == kafka.ErrTimedOut {
+					continue // Nincs üzenet a timeout miatt, folytatjuk a loop-ot
 				}
 				log.Printf("Hiba üzenet olvasásakor Kafka-ból: %v", err)
 				continue
 			}
 
 			/*
-				log.Printf("Üzenet érkezett: Topic: %s, Partition: %d, Offset: %d, Key: %s, Value: %s",
-					msg.Topic, msg.Partition, msg.Offset, string(msg.Key), string(msg.Value))
+				log.Printf("Üzenet érkezett: Topic: %s, Partition: %d, Offset: %v, Key: %s, Value: %s",
+					msg.TopicPartition.Topic, msg.TopicPartition.Partition, msg.TopicPartition.Offset, string(msg.Key), string(msg.Value))
 			*/
 			if err := messageHandler(msg.Key, msg.Value); err != nil {
 				log.Printf("Hiba az üzenet feldolgozásakor: %v", err)
 			} else {
-				if err := mk.kafkaConsumer.CommitMessages(ctx, msg); err != nil {
-					log.Printf("Hiba az offset commitálásakor: %v", err)
-				}
+				// Az offset commitálása automatikusan történik, ha az "enable.auto.commit" true (alapértelmezett).
+				// Ha manuálisan szeretnénk commitálni, állítsuk "enable.auto.commit"-ot false-ra a konfigurációban
+				// és használjuk a consumer.CommitMessage(msg) metódust.
 			}
 		}
 	}
 }
 
 func (mk *MyKafka) TestSendMessage(ctx context.Context) {
-	message := kafka.Message{
-		Key:   []byte("test-key"),
-		Value: []byte("test-value"),
+	if mk.kafkaProducer == nil {
+		if err := mk.InitProducer(); err != nil {
+			log.Printf("Nem sikerült inicializálni a producert a tesztüzenet küldéséhez: %v", err)
+			return
+		}
 	}
 
-	err := mk.kafkaProducer.WriteMessages(ctx, message)
+	deliveryChan := make(chan kafka.Event)
+	defer close(deliveryChan)
+
+	message := &kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &uploadTopic, Partition: kafka.PartitionAny},
+		Key:            []byte("test-key"),
+		Value:          []byte("test-value"),
+	}
+
+	err := mk.kafkaProducer.Produce(message, deliveryChan)
 	if err != nil {
-		log.Printf("Error sending test message to Kafka: %+v", err)
+		log.Printf("Hiba tesztüzenet küldésekor a Kafka-ba: %v", err)
 	} else {
-		log.Println("Test message sent successfully")
+		e := <-deliveryChan
+		switch ev := e.(type) {
+		case *kafka.Message:
+			if ev.TopicPartition.Error != nil {
+				log.Printf("Tesztüzenet kézbesítési hiba: %v\n", ev.TopicPartition.Error)
+			} else {
+				log.Println("Tesztüzenet sikeresen elküldve")
+			}
+		case kafka.Error:
+			log.Printf("Kafka hiba a tesztüzenet küldésekor: %v\n", ev)
+		}
 	}
 }
