@@ -28,7 +28,7 @@
           window.location.href = "/static/login.html";
         });
 
-        const ws = new WebSocket("ws://detector-service:80/ws");
+        const ws = new WebSocket("ws://192.168.1.126:32052/ws");
 
         ws.onopen = function() {
             console.log("Sikeres WebSocket kapcsolat!");
