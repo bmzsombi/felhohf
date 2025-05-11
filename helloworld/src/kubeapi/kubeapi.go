@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"strings"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	v1 "k8s.io/api/core/v1"
@@ -21,19 +21,33 @@ type KubeClient struct {
 }
 
 func NewKubeClient() (*KubeClient, error) {
-	var kubeconfig string
-	if os.Getenv("KUBECONFIG") != "" {
-		kubeconfig = os.Getenv("KUBECONFIG")
-	} else {
-		kubeconfig = "/root/.kube/config"
+	secretName := "detector-kubeconfig"
+	clusterConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err // Hiba, ha nem tudjuk használni az in-cluster configot.
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	clientset, err := kubernetes.NewForConfig(clusterConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	secret, err := clientset.CoreV1().Secrets("detector").Get(context.Background(), secretName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err // Fontos: Visszatérünk a hibaüzenettel, ha a Secret nem található.
+	}
+
+	kubeconfigData, ok := secret.Data["config"]
+	if !ok {
+		return nil, fmt.Errorf("secret %s/%s does not contain a 'config' key", "detector", secretName)
+	}
+
+	config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigData)
+	if err != nil {
+		return nil, err
+	}
+
+	clientset, err = kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
