@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 	"time"
 
@@ -147,9 +148,51 @@ func listFiles(w http.ResponseWriter, r *http.Request) {
 // @Router /lists/{filename} [get]
 func (a *App) displayImage(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Path[len("/lists/"):]
-	filepath := filepath.Join("/mnt/data", filename)
-	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+	path := filepath.Join("/mnt/data", filename)
+	fileInfo, err := os.Stat(path)
+	if os.IsNotExist(err) {
 		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if fileInfo.IsDir() {
+		// Ha egy könyvtár, listázzuk a tartalmát
+		files, err := os.ReadDir(path)
+		if err != nil {
+			http.Error(w, "Failed to read directory", http.StatusInternalServerError)
+			return
+		}
+
+		html := `
+		<!DOCTYPE html>
+		<html lang="en">
+		<head>
+			<meta charset="UTF-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<title>` + filename + ` - Könyvtár</title>
+		</head>
+		<body>
+			<a href="/lists" style="text-decoration: none; color: blue; font-size: 16px;">Vissza a listához</a>
+			<h1>` + filename + ` - Könyvtár tartalma</h1>
+			<ul>
+		`
+		for _, file := range files {
+			if !strings.HasPrefix(file.Name(), ".") { // Rejtett fájlok/mappák kihagyása
+				link := filepath.Join("/lists", filename, file.Name())
+				html += fmt.Sprintf(`<li><a href="%s">%s</a></li>`, link, file.Name())
+			}
+		}
+		html += `
+			</ul>
+		</body>
+		</html>
+		`
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(html))
 		return
 	}
 
