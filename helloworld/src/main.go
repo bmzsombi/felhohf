@@ -154,12 +154,13 @@ func (a *App) uploadFile(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "File uploaded but failed to start processing job.", http.StatusInternalServerError)
 			return
 		}
-
-		//message := map[string]string{"image_url": "/files/" + header.Filename}
-		//messageJSON, _ := json.Marshal(message)
-		err = a.MyKafka.SendMessage(context.Background(), []byte("asd"), []byte("messageJSON"))
+		/*
+			message := map[string]string{"image_url": "/files/" + header.Filename}
+			messageJSON, _ := json.Marshal(message)*/
+		//err = a.MyKafka.SendMessage(context.Background(), []byte(header.Filename), []byte(messageJSON))
+		a.MyKafka.TestSendMessage(context.Background())
 		if err != nil {
-			log.Printf("Failed to send Kafka message for file '%s': %v", header.Filename, err)
+			log.Printf("Failed to send Kafka message for file '%s': %+v", header.Filename, err)
 		}
 		w.Write([]byte("File uploaded successfully!"))
 	} else {

@@ -137,3 +137,17 @@ func (mk *MyKafka) ConsumeMessages(ctx context.Context, messageHandler func(key,
 		}
 	}
 }
+
+func (mk *MyKafka) TestSendMessage(ctx context.Context) {
+	message := kafka.Message{
+		Key:   []byte("test-key"),
+		Value: []byte("test-value"),
+	}
+
+	err := mk.kafkaProducer.WriteMessages(ctx, message)
+	if err != nil {
+		log.Printf("Error sending test message to Kafka: %+v", err)
+	} else {
+		log.Println("Test message sent successfully")
+	}
+}
