@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-reader
+  namespace: detector # A namespace, ahol a Secret és a Pod található
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: read-detector-kubeconfig
+  namespace: detector # A namespace, ahol a Role és a Pod található
+subjects:
+- kind: ServiceAccount
+  name: default # A ServiceAccount neve, amelyet a Pod használ (ellenőrizd a Pod specifikációjában)
+  namespace: detector # A ServiceAccount namespace-e
+roleRef:
+  kind: Role
+  name: secret-reader # A létrehozott Role neve
+  apiGroup: rbac.authorization.k8s.io

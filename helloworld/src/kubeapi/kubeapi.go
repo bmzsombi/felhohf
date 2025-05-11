@@ -55,10 +55,31 @@ func NewKubeClient() (*KubeClient, error) {
 	return &KubeClient{Clientset: clientset}, nil
 }
 
+func generatePodName(jobId string) string {
+	safeJobId := strings.ToLower(jobId)
+	safeJobId = strings.ReplaceAll(safeJobId, "_", "-")
+	var result strings.Builder
+	for _, r := range safeJobId {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			result.WriteRune(r)
+		}
+	}
+	name := result.String()
+	if len(name) > 40 { // Truncate if too long, allowing for prefix and suffix
+		name = name[:40]
+	}
+	name = strings.Trim(name, "-")
+	if name == "" {
+		name = "default-job"
+	}
+	return fmt.Sprintf("yolo-job-%s-%d", name, time.Now().UnixNano()%10000)
+}
+
 func (kc *KubeClient) CreatePod(filename string, pvcName string, namespace string) (string, error) {
+	podName := generatePodName()
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "yolopod-" + filename,
+			Name:      podName,
 			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
@@ -100,14 +121,14 @@ func (kc *KubeClient) CreatePod(filename string, pvcName string, namespace strin
 		},
 	}
 
-	log.Printf("Attempting to create pod: %s in namespace: %s for image: %s", "yolopod-"+filename, namespace, filename)
+	log.Printf("Attempting to create pod: %s in namespace: %s for image: %s", podName, namespace, filename)
 	createdPod, err := kc.Clientset.CoreV1().Pods(namespace).Create(
 		context.Background(),
 		pod,
 		metav1.CreateOptions{},
 	)
 	if err != nil {
-		log.Printf("Cannot create pod '%s': %v", "yolopod-"+filename, err)
+		log.Printf("Cannot create pod '%s': %v", podName, err)
 		return "", err
 	}
 	log.Printf("Successfully created pod: %s in namespace: %s", createdPod.Name, createdPod.Namespace)
