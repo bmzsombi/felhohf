@@ -103,7 +103,7 @@ func (kc *KubeClient) CreatePod(filename string, pvcName string, namespace strin
 						"detect.py",
 						"--source", "/mnt/data/" + filename,
 						"--project", "/mnt/data/",
-						"--name", filename + "-detected",
+						"--name", filename + ".jpg",
 						"--weights", "yolov5s.pt",
 					},
 					VolumeMounts: []v1.VolumeMount{ // Itt csatoljuk a volume-ot a konténerhez
