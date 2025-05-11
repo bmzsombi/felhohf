@@ -6,24 +6,48 @@
 package main
 
 import (
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"text/template"
+	"time"
 
 	auth "helloworld/db"
 	_ "helloworld/docs" // Import the generated swagger docs
+	"helloworld/kubeapi"
 
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
+type App struct {
+	KubeClient           *kubeapi.KubeClient
+	PvcName              string // A használandó PVC neve
+	Namespace            string // A namespace, ahol a podokat indítjuk
+	UploadDir            string // A Go app Podjában ide van csatolva a PVC (pl. /mnt/k8s_data)
+	PodCompletionTimeout time.Duration
+}
+
 func main() {
 	auth.InitDB()
 
-	http.HandleFunc("/", uploadFile)
+	kc, err := kubeapi.NewKubeClient()
+	if err != nil {
+		log.Fatalf("Failed to initialize KubeClient: %v", err)
+	}
+
+	app := &App{
+		KubeClient: kc,
+		PvcName:    "detector-pvc", // Ezt a PVC-t létre kell hoznod a klaszterben!
+		Namespace:  "detector",     // A namespace, ahol a yolo podok futnak
+		UploadDir:  "/mnt/data/",   // A Go app Podjában ide van csatolva a PVC egy almappája, vagy maga a PVC.
+	}
+
+	http.HandleFunc("/", app.uploadFile)
 	http.HandleFunc("/lists", listFiles)
-	http.HandleFunc("/lists/", displayImage)
+	http.HandleFunc("/lists/", app.displayImage)
 	http.HandleFunc("/files/", serveFile)
 	http.HandleFunc("/register", auth.RegisterHandler)
 	http.HandleFunc("/login", auth.LoginHandler)
@@ -44,7 +68,7 @@ func main() {
 // @Failure 400 {string} string "Bad request"
 // @Failure 500 {string} string "Internal server error"
 // @Router / [post]
-func uploadFile(w http.ResponseWriter, r *http.Request) {
+func (a *App) uploadFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		file, header, err := r.FormFile("file")
 		if err != nil {
@@ -64,6 +88,20 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 		_, err = io.Copy(out, file)
 		if err != nil {
 			http.Error(w, "Unable to save file", http.StatusInternalServerError)
+			return
+		}
+
+		podName, err := a.KubeClient.CreatePod(header.Filename, a.PvcName, a.Namespace)
+		if err != nil {
+			log.Printf("Failed to create Kubernetes pod for file '%s': %v", header.Filename, err)
+			http.Error(w, "File uploaded but failed to start processing job.", http.StatusInternalServerError)
+			return
+		}
+
+		err = a.KubeClient.WaitForPodCompletion(podName, a.Namespace, a.PodCompletionTimeout)
+		if err != nil {
+			log.Printf("Pod '%s' processing failed or timed out: %v", podName, err)
+			http.Error(w, fmt.Sprintf("Processing job for '%s' failed or timed out.", header.Filename), http.StatusInternalServerError)
 			return
 		}
 
@@ -107,7 +145,7 @@ func listFiles(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {string} string "File not found"
 // @Failure 500 {string} string "Internal server error"
 // @Router /lists/{filename} [get]
-func displayImage(w http.ResponseWriter, r *http.Request) {
+func (a *App) displayImage(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Path[len("/lists/"):]
 	filepath := filepath.Join("/mnt/data", filename)
 	if _, err := os.Stat(filepath); os.IsNotExist(err) {
