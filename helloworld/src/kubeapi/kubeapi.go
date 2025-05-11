@@ -23,7 +23,7 @@ func NewKubeClient() (*KubeClient, error) {
 	secretName := "detector-kubeconfig"
 	clusterConfig, err := rest.InClusterConfig()
 	if err != nil {
-		return nil, err // Hiba, ha nem tudjuk használni az in-cluster configot.
+		return nil, err
 	}
 
 	clientset, err := kubernetes.NewForConfig(clusterConfig)
@@ -33,7 +33,7 @@ func NewKubeClient() (*KubeClient, error) {
 
 	secret, err := clientset.CoreV1().Secrets("detector").Get(context.Background(), secretName, metav1.GetOptions{})
 	if err != nil {
-		return nil, err // Fontos: Visszatérünk a hibaüzenettel, ha a Secret nem található.
+		return nil, err
 	}
 
 	kubeconfigData, ok := secret.Data["config"]
@@ -64,7 +64,7 @@ func generatePodName(jobId string) string {
 		}
 	}
 	name := result.String()
-	if len(name) > 40 { // Truncate if too long, allowing for prefix and suffix
+	if len(name) > 40 {
 		name = name[:40]
 	}
 	name = strings.Trim(name, "-")
@@ -82,13 +82,13 @@ func (kc *KubeClient) CreatePod(filename string, pvcName string, namespace strin
 			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyNever, // Job-szerű Pod, nem indul újra automatikusan
-			Volumes: []v1.Volume{ // Itt definiáljuk a Pod által használt volume-okat
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
 				{
-					Name: "image-storage", // A volume neve a Pod-on belül
+					Name: "image-storage",
 					VolumeSource: v1.VolumeSource{
 						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: pvcName, // A Kubernetes klaszterben létező PVC neve
+							ClaimName: pvcName,
 						},
 					},
 				},
@@ -102,13 +102,13 @@ func (kc *KubeClient) CreatePod(filename string, pvcName string, namespace strin
 						"detect.py",
 						"--source", "/mnt/data/" + filename,
 						"--project", "/mnt/data/",
-						"--name", filename + ".jpg",
+						"--name", filename + "-detected",
 						"--weights", "yolov5s.pt",
 					},
-					VolumeMounts: []v1.VolumeMount{ // Itt csatoljuk a volume-ot a konténerhez
+					VolumeMounts: []v1.VolumeMount{
 						{
-							Name:      "image-storage", // A fent definiált Volume neve
-							MountPath: "/mnt/data",     // Hova csatolja a konténeren belül
+							Name:      "image-storage",
+							MountPath: "/mnt/data",
 						},
 					},
 				},
@@ -133,68 +133,3 @@ func (kc *KubeClient) CreatePod(filename string, pvcName string, namespace strin
 	log.Printf("Successfully created pod: %s in namespace: %s", createdPod.Name, createdPod.Namespace)
 	return createdPod.Name, nil
 }
-
-/*
-func (kc *KubeClient) WaitForPodCompletion(podName, namespace string, timeout time.Duration) error {
-	log.Printf("Waiting for pod %s to complete...", podName)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for pod %s to complete: %w", podName, ctx.Err())
-		default:
-			pod, err := kc.Clientset.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
-			if err != nil {
-				log.Printf("Error getting pod %s status: %v. Retrying...", podName, err)
-				// Lehet, hogy a pod még nem jelenik meg azonnal a lekérdezéskor
-				time.Sleep(2 * time.Second)
-				continue
-			}
-
-			log.Printf("Pod %s status: %s", podName, pod.Status.Phase)
-
-			switch pod.Status.Phase {
-			case v1.PodSucceeded:
-				log.Printf("Pod %s completed successfully.", podName)
-				return nil
-			case v1.PodFailed:
-				// Próbáljuk meg lekérni a konténer logját hiba esetén
-				containerLog, logErr := kc.GetPodLogs(podName, namespace, "yolo-processor")
-				if logErr != nil {
-					log.Printf("Error getting logs for failed pod %s: %v", podName, logErr)
-				} else {
-					log.Printf("Logs for failed pod %s:\n%s", podName, containerLog)
-				}
-				return fmt.Errorf("pod %s failed. Status: %s, Message: %s", podName, pod.Status.Reason, pod.Status.Message)
-			case v1.PodPending, v1.PodRunning:
-				// Várjunk tovább
-				time.Sleep(5 * time.Second) // Poll interval
-			default:
-				// Ismeretlen vagy átmeneti állapot
-				time.Sleep(5 * time.Second)
-			}
-		}
-	}
-}
-
-func (kc *KubeClient) GetPodLogs(podName, namespace, containerName string) (string, error) {
-	podLogOpts := v1.PodLogOptions{
-		Container: containerName,
-	}
-	req := kc.Clientset.CoreV1().Pods(namespace).GetLogs(podName, &podLogOpts)
-	podLogs, err := req.Stream(context.Background())
-	if err != nil {
-		return "", fmt.Errorf("error in opening stream: %w", err)
-	}
-	defer podLogs.Close()
-
-	buf := new(strings.Builder)
-	_, err = io.Copy(buf, podLogs)
-	if err != nil {
-		return "", fmt.Errorf("error in copy information from log stream: %w", err)
-	}
-	return buf.String(), nil
-}
-*/

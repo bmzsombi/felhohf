@@ -5,7 +5,9 @@ go 1.24.0
 toolchain go1.24.3
 
 require (
+	github.com/confluentinc/confluent-kafka-go v1.9.2
 	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/lib/pq v1.10.9
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/swaggo/swag v1.16.4

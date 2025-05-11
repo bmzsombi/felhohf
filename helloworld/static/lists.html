@@ -27,6 +27,33 @@
           localStorage.removeItem("token");
           window.location.href = "/static/login.html";
         });
+
+        const ws = new WebSocket("ws://detector-service:80/ws");
+
+        ws.onopen = function() {
+            console.log("Sikeres WebSocket kapcsolat!");
+        };
+
+        ws.onmessage = function(event) {
+            console.log("Üzenet érkezett a szerverről:", event.data);
+            try {
+                const message = JSON.parse(event.data);
+                if (message.image_url) {
+                    alert("Új kép töltődött fel: " + message.image_url);
+                }
+            } catch (error) {
+                console.error("Hiba az üzenet feldolgozása során:", error);
+                alert("Nem JSON üzenet érkezett: " + event.data)
+            }
+        };
+
+        ws.onclose = function() {
+            console.log("A WebSocket kapcsolat megszakadt.");
+        };
+
+        ws.onerror = function(error) {
+            console.error("Hiba a WebSocket kapcsolatban:", error);
+        };
     </script>
 </body>
 </html>

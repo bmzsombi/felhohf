@@ -6,6 +6,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -13,22 +15,34 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
 	auth "helloworld/db"
-	_ "helloworld/docs" // Import the generated swagger docs
+	_ "helloworld/docs"
+	mykafka "helloworld/kafka"
 	"helloworld/kubeapi"
 
+	"github.com/gorilla/websocket"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 type App struct {
 	KubeClient           *kubeapi.KubeClient
-	PvcName              string // A használandó PVC neve
-	Namespace            string // A namespace, ahol a podokat indítjuk
-	UploadDir            string // A Go app Podjában ide van csatolva a PVC (pl. /mnt/k8s_data)
+	PvcName              string
+	Namespace            string
+	UploadDir            string
 	PodCompletionTimeout time.Duration
+	MyKafka              *mykafka.MyKafka
+	WsConnections        map[*websocket.Conn]bool // WebSocket kapcsolatok
+	WsMutex              *sync.Mutex
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
 func main() {
@@ -39,12 +53,31 @@ func main() {
 		log.Fatalf("Failed to initialize KubeClient: %v", err)
 	}
 
-	app := &App{
-		KubeClient: kc,
-		PvcName:    "detector-pvc", // Ezt a PVC-t létre kell hoznod a klaszterben!
-		Namespace:  "detector",     // A namespace, ahol a yolo podok futnak
-		UploadDir:  "/mnt/data/",   // A Go app Podjában ide van csatolva a PVC egy almappája, vagy maga a PVC.
+	mykafka := &mykafka.MyKafka{}
+
+	err = mykafka.InitProducer()
+	if err != nil {
+		log.Fatalf("Producer initialization error: %v", err)
 	}
+	err = mykafka.InitConsumer()
+	if err != nil {
+		log.Fatalf("Hiba a consumer inicializálásakor: %v", err)
+	}
+	defer mykafka.CloseProducerCloseConsumer()
+
+	app := &App{
+		KubeClient:    kc,
+		PvcName:       "detector-pvc",
+		Namespace:     "detector",
+		UploadDir:     "/mnt/data/",
+		MyKafka:       mykafka,
+		WsConnections: make(map[*websocket.Conn]bool),
+		WsMutex:       &sync.Mutex{},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go mykafka.ConsumeMessages(ctx, app.messageHandler)
 
 	http.HandleFunc("/", app.uploadFile)
 	http.HandleFunc("/lists", listFiles)
@@ -53,11 +86,35 @@ func main() {
 	http.HandleFunc("/register", auth.RegisterHandler)
 	http.HandleFunc("/login", auth.LoginHandler)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	http.HandleFunc("/ws", app.handleWebSocket)
 
 	// Swagger UI
 	http.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	http.ListenAndServe(":8443", nil)
+}
+
+func (a *App) messageHandler(key, value []byte) error {
+	log.Printf("Üzenet feldolgozása: Key: %s, Value: %s\n", string(key), string(value))
+
+	// Értesítés küldése a WebSocket klienseknek
+	var msg map[string]string
+	err := json.Unmarshal(value, &msg)
+	if err != nil {
+		log.Printf("Failed to unmarshal message value: %v", err)
+		return err // Consider if you want to continue processing other messages
+	}
+	a.WsMutex.Lock()
+	for conn := range a.WsConnections {
+		err = conn.WriteJSON(msg) // Send the message as JSON
+		if err != nil {
+			log.Printf("Failed to send message to WebSocket connection: %v", err)
+			delete(a.WsConnections, conn) // Remove the connection if sending fails
+			conn.Close()
+		}
+	}
+	a.WsMutex.Unlock()
+	return nil
 }
 
 // @Summary Upload a File
@@ -98,14 +155,13 @@ func (a *App) uploadFile(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "File uploaded but failed to start processing job.", http.StatusInternalServerError)
 			return
 		}
-		/*
-			err = a.KubeClient.WaitForPodCompletion(podName, a.Namespace, a.PodCompletionTimeout)
-			if err != nil {
-				log.Printf("Pod '%s' processing failed or timed out: %v", podName, err)
-				http.Error(w, fmt.Sprintf("Processing job for '%s' failed or timed out.", header.Filename), http.StatusInternalServerError)
-				return
-			}
-		*/
+
+		message := map[string]string{"image_url": "/files/" + header.Filename} // Correct URL for frontend
+		messageJSON, _ := json.Marshal(message)
+		err = a.MyKafka.SendMessage(context.Background(), []byte(header.Filename), messageJSON)
+		if err != nil {
+			log.Printf("Failed to send Kafka message for file '%s': %v", header.Filename, err)
+		}
 		w.Write([]byte("File uploaded successfully!"))
 	} else {
 		http.ServeFile(w, r, "static/login.html")
@@ -160,7 +216,6 @@ func (a *App) displayImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fileInfo.IsDir() {
-		// Ha egy könyvtár, listázzuk a tartalmát
 		files, err := os.ReadDir(path)
 		if err != nil {
 			http.Error(w, "Failed to read directory", http.StatusInternalServerError)
@@ -181,7 +236,7 @@ func (a *App) displayImage(w http.ResponseWriter, r *http.Request) {
 			<ul>
 		`
 		for _, file := range files {
-			if !strings.HasPrefix(file.Name(), ".") { // Rejtett fájlok/mappák kihagyása
+			if !strings.HasPrefix(file.Name(), ".") {
 				link := filepath.Join("/lists", filename, file.Name())
 				html += fmt.Sprintf(`<li><a href="%s">%s</a></li>`, link, file.Name())
 			}
@@ -233,4 +288,28 @@ func serveFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeFile(w, r, path)
+}
+
+func (a *App) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer conn.Close()
+
+	a.WsMutex.Lock()
+	a.WsConnections[conn] = true
+	a.WsMutex.Unlock()
+
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			a.WsMutex.Lock()
+			delete(a.WsConnections, conn)
+			a.WsMutex.Unlock()
+			log.Println("WebSocket connection closed:", err)
+			break
+		}
+	}
 }
