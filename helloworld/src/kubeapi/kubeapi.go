@@ -76,7 +76,7 @@ func generatePodName(jobId string) string {
 }
 
 func (kc *KubeClient) CreatePod(filename string, pvcName string, namespace string) (string, error) {
-	podName := generatePodName()
+	podName := generatePodName(filename)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
