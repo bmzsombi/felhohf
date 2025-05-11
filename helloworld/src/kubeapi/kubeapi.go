@@ -3,7 +3,6 @@ package kubeapi
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"strings"
 	"time"
@@ -135,6 +134,7 @@ func (kc *KubeClient) CreatePod(filename string, pvcName string, namespace strin
 	return createdPod.Name, nil
 }
 
+/*
 func (kc *KubeClient) WaitForPodCompletion(podName, namespace string, timeout time.Duration) error {
 	log.Printf("Waiting for pod %s to complete...", podName)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -197,3 +197,4 @@ func (kc *KubeClient) GetPodLogs(podName, namespace, containerName string) (stri
 	}
 	return buf.String(), nil
 }
+*/

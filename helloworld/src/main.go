@@ -92,20 +92,20 @@ func (a *App) uploadFile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		podName, err := a.KubeClient.CreatePod(header.Filename, a.PvcName, a.Namespace)
+		_, err = a.KubeClient.CreatePod(header.Filename, a.PvcName, a.Namespace)
 		if err != nil {
 			log.Printf("Failed to create Kubernetes pod for file '%s': %v", header.Filename, err)
 			http.Error(w, "File uploaded but failed to start processing job.", http.StatusInternalServerError)
 			return
 		}
-
-		err = a.KubeClient.WaitForPodCompletion(podName, a.Namespace, a.PodCompletionTimeout)
-		if err != nil {
-			log.Printf("Pod '%s' processing failed or timed out: %v", podName, err)
-			http.Error(w, fmt.Sprintf("Processing job for '%s' failed or timed out.", header.Filename), http.StatusInternalServerError)
-			return
-		}
-
+		/*
+			err = a.KubeClient.WaitForPodCompletion(podName, a.Namespace, a.PodCompletionTimeout)
+			if err != nil {
+				log.Printf("Pod '%s' processing failed or timed out: %v", podName, err)
+				http.Error(w, fmt.Sprintf("Processing job for '%s' failed or timed out.", header.Filename), http.StatusInternalServerError)
+				return
+			}
+		*/
 		w.Write([]byte("File uploaded successfully!"))
 	} else {
 		http.ServeFile(w, r, "static/login.html")
