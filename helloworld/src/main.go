@@ -155,9 +155,9 @@ func (a *App) uploadFile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		message := map[string]string{"image_url": "/files/" + header.Filename}
-		messageJSON, _ := json.Marshal(message)
-		err = a.MyKafka.SendMessage(context.Background(), []byte(header.Filename), []byte(messageJSON))
+		//message := map[string]string{"image_url": "/files/" + header.Filename}
+		//messageJSON, _ := json.Marshal(message)
+		err = a.MyKafka.SendMessage(context.Background(), []byte("asd"), []byte("messageJSON"))
 		if err != nil {
 			log.Printf("Failed to send Kafka message for file '%s': %v", header.Filename, err)
 		}
