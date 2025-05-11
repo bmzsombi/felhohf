@@ -24,6 +24,8 @@ func NewKubeClient() (*KubeClient, error) {
 	var kubeconfig string
 	if os.Getenv("KUBECONFIG") != "" {
 		kubeconfig = os.Getenv("KUBECONFIG")
+	} else {
+		kubeconfig = "/root/.kube/config"
 	}
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
