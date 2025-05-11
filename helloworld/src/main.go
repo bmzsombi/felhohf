@@ -97,19 +97,18 @@ func main() {
 func (a *App) messageHandler(key, value []byte) error {
 	log.Printf("Üzenet feldolgozása: Key: %s, Value: %s\n", string(key), string(value))
 
-	// Értesítés küldése a WebSocket klienseknek
 	var msg map[string]string
 	err := json.Unmarshal(value, &msg)
 	if err != nil {
 		log.Printf("Failed to unmarshal message value: %v", err)
-		return err // Consider if you want to continue processing other messages
+		return err
 	}
 	a.WsMutex.Lock()
 	for conn := range a.WsConnections {
-		err = conn.WriteJSON(msg) // Send the message as JSON
+		err = conn.WriteJSON(msg)
 		if err != nil {
 			log.Printf("Failed to send message to WebSocket connection: %v", err)
-			delete(a.WsConnections, conn) // Remove the connection if sending fails
+			delete(a.WsConnections, conn)
 			conn.Close()
 		}
 	}
@@ -156,7 +155,7 @@ func (a *App) uploadFile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		message := map[string]string{"image_url": "/files/" + header.Filename} // Correct URL for frontend
+		message := map[string]string{"image_url": "/files/" + header.Filename}
 		messageJSON, _ := json.Marshal(message)
 		err = a.MyKafka.SendMessage(context.Background(), []byte(header.Filename), messageJSON)
 		if err != nil {

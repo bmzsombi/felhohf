@@ -48,7 +48,7 @@ func (mk *MyKafka) SendMessage(ctx context.Context, key, value []byte) error {
 
 	err := mk.kafkaProducer.WriteMessages(ctx, message)
 	if err != nil {
-		log.Printf("Hiba az üzenet küldésekor a Kafka-ba: %v", err)
+		log.Printf("Hiba az üzenet küldésekor a Kafka-ba: %+v", err)
 		return err
 	}
 
