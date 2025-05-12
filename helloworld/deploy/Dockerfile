@@ -14,9 +14,9 @@ COPY src/ ./
 RUN go mod tidy
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -o helloworld
+RUN CGO_ENABLED=0 GOOS=linux go build -a -o /app/helloworld
 
 FROM scratch
-COPY --from=build /helloworld .
+COPY --from=build /app/helloworld .
 COPY static /static
 CMD ["/helloworld"]
