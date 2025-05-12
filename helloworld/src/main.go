@@ -6,7 +6,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,7 +20,6 @@ import (
 
 	auth "helloworld/db"
 	_ "helloworld/docs"
-	mykafka "helloworld/kafka"
 	"helloworld/kubeapi"
 
 	"github.com/gorilla/websocket"
@@ -29,14 +27,14 @@ import (
 )
 
 type App struct {
-	KubeClient           *kubeapi.KubeClient
-	PvcName              string
-	Namespace            string
-	UploadDir            string
-	PodCompletionTimeout time.Duration
-	MyKafka              *mykafka.MyKafka
-	WsConnections        map[*websocket.Conn]bool // WebSocket kapcsolatok
-	WsMutex              *sync.Mutex
+	KubeClient             *kubeapi.KubeClient
+	PvcName                string
+	Namespace              string
+	UploadDir              string
+	PodCompletionTimeout   time.Duration
+	WsConnections          map[*websocket.Conn]bool // WebSocket kapcsolatok
+	WsMutex                *sync.Mutex
+	UploadNotificationChan chan string
 }
 
 var upgrader = websocket.Upgrader{
@@ -53,38 +51,17 @@ func main() {
 		log.Fatalf("Failed to initialize KubeClient: %v", err)
 	}
 
-	mykafka := &mykafka.MyKafka{}
-	kafkaClient := mykafka.NewMyKafka()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	if err := mykafka.InitWriter(); err != nil {
-		log.Fatalf("Writer initialization error: %v", err)
-	}
-	if err = mykafka.InitReader(); err != nil {
-		log.Fatalf("Hiba a consumer inicializálásakor: %v", err)
-	}
-	defer mykafka.CloseWriterReader()
-	go func() {
-		kafkaClient.ConsumeMessages(ctx, func(key, value []byte) error {
-			log.Printf("Handler kapott üzenetet - Kulcs: %s, Érték: %s\n", string(key), string(value))
-			time.Sleep(50 * time.Millisecond)
-			return nil
-		})
-	}()
-
 	app := &App{
-		KubeClient:    kc,
-		PvcName:       "detector-pvc",
-		Namespace:     "detector",
-		UploadDir:     "/mnt/data/",
-		MyKafka:       mykafka,
-		WsConnections: make(map[*websocket.Conn]bool),
-		WsMutex:       &sync.Mutex{},
+		KubeClient:             kc,
+		PvcName:                "detector-pvc",
+		Namespace:              "detector",
+		UploadDir:              "/mnt/data/",
+		WsConnections:          make(map[*websocket.Conn]bool),
+		WsMutex:                &sync.Mutex{},
+		UploadNotificationChan: make(chan string),
 	}
 
-	//go mykafka.ConsumeMessages(ctx, app.messageHandler)
+	go app.listenForUploadNotifications()
 
 	http.HandleFunc("/", app.uploadFile)
 	http.HandleFunc("/lists", listFiles)
@@ -99,6 +76,17 @@ func main() {
 	http.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	http.ListenAndServe(":8443", nil)
+}
+
+func (a *App) listenForUploadNotifications() {
+	log.Println("Upload notification listener started.")
+	// Ez a ciklus addig fut, amíg a channel nyitva van és üzenetek érkeznek.
+	// Ha az alkalmazásnak lenne szabályos leállítása, a channelt le kellene zárni.
+	for notification := range a.UploadNotificationChan {
+		log.Printf("[UPLOAD NOTIFICATION] %s", notification)
+		// Itt további feldolgozás is történhetne, pl. WebSocket üzenet küldése, stb.
+	}
+	log.Println("Upload notification listener stopped.") // Ez csak akkor fut le, ha a channel lezárul.
 }
 
 func (a *App) messageHandler(key, value []byte) error {
@@ -162,16 +150,8 @@ func (a *App) uploadFile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		message := map[string]string{"image_url": "/files/" + header.Filename}
-		messageJSON, _ := json.Marshal(message)
-		err = a.MyKafka.SendMessage(context.Background(), []byte(header.Filename), []byte(messageJSON))
-		if err != nil {
-			log.Printf("asdasd")
-		}
-		// a.MyKafka.TestSendMessage(context.Background())
-		// if err != nil {
-		// 	log.Printf("Failed to send Kafka message for file '%s': %+v", header.Filename, err)
-		// }
+		notificationMsg := fmt.Sprintf("File '%s' uploaded, by an other user", header.Filename)
+		a.UploadNotificationChan <- notificationMsg
 		w.Write([]byte("File uploaded successfully!"))
 	} else {
 		http.ServeFile(w, r, "static/login.html")
