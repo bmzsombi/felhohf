@@ -80,11 +80,18 @@ func main() {
 
 func (a *App) listenForUploadNotifications() {
 	log.Println("Upload notification listener started.")
-	// Ez a ciklus addig fut, amíg a channel nyitva van és üzenetek érkeznek.
-	// Ha az alkalmazásnak lenne szabályos leállítása, a channelt le kellene zárni.
 	for notification := range a.UploadNotificationChan {
 		log.Printf("[UPLOAD NOTIFICATION] %s", notification)
-		// Itt további feldolgozás is történhetne, pl. WebSocket üzenet küldése, stb.
+		a.WsMutex.Lock()
+		for conn := range a.WsConnections {
+			err := conn.WriteJSON(map[string]string{"message": notification})
+			if err != nil {
+				log.Printf("Failed to send upload notification to WebSocket connection: %v", err)
+				delete(a.WsConnections, conn)
+				conn.Close()
+			}
+		}
+		a.WsMutex.Unlock()
 	}
 	log.Println("Upload notification listener stopped.") // Ez csak akkor fut le, ha a channel lezárul.
 }
