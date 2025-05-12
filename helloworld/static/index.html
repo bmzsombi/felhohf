@@ -3,6 +3,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Helloworld</title>
+    <style>
+        .popup {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background-color: lightgreen;
+            color: black;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+        }
+    </style>
 </head>
 <body>
     <a href="/lists" style="text-decoration: none; color: blue; font-size: 16px;">Kilistázott képek</a>
@@ -11,12 +24,14 @@
         <button type="submit">Fájl feltöltése</button>
     </form>
     <br>
+    <div id="notificationPopup" class="popup" style="display:none;"></div>
     <script>
         if (!localStorage.getItem("token")) {
           window.location.href = "/static/login.html";
         }
 
         const ws = new WebSocket("ws://100.114.169.22:32052/ws");
+        const notificationPopup = document.getElementById("notificationPopup");
 
         ws.onopen = function() {
             console.log("Sikeres WebSocket kapcsolat!");
@@ -26,9 +41,22 @@
             console.log("Üzenet érkezett a szerverről:", event.data);
             try {
                 const message = JSON.parse(event.data);
+                let notificationText = "";
                 if (message.image_url) {
-                    alert("Új kép töltődött fel: " + message.image_url);
+                    notificationText = "Új kép töltődött fel: " + message.image_url;
+                } else if (message.message) {
+                    notificationText = message.message;
+                } else {
+                    notificationText = "Új üzenet érkezett: " + event.data;
                 }
+
+                notificationPopup.textContent = notificationText;
+                notificationPopup.style.display = "block";
+
+                setTimeout(() => {
+                    notificationPopup.style.display = "none";
+                }, 3000);
+
             } catch (error) {
                 console.error("Hiba az üzenet feldolgozása során:", error);
                 alert("Nem JSON üzenet érkezett: " + event.data)
@@ -43,6 +71,6 @@
             console.error("Hiba a WebSocket kapcsolatban:", error);
         };
     </script>
-    
+
 </body>
 </html>
