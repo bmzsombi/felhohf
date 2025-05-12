@@ -54,16 +54,25 @@ func main() {
 	}
 
 	mykafka := &mykafka.MyKafka{}
+	kafkaClient := mykafka.NewMyKafka()
 
-	err = mykafka.InitProducer()
-	if err != nil {
-		log.Fatalf("Producer initialization error: %v", err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := mykafka.InitWriter(); err != nil {
+		log.Fatalf("Writer initialization error: %v", err)
 	}
-	err = mykafka.InitConsumer()
-	if err != nil {
+	if err = mykafka.InitReader(); err != nil {
 		log.Fatalf("Hiba a consumer inicializálásakor: %v", err)
 	}
-	defer mykafka.CloseProducerCloseConsumer()
+	defer mykafka.CloseWriterReader()
+	go func() {
+		kafkaClient.ConsumeMessages(ctx, func(key, value []byte) error {
+			log.Printf("Handler kapott üzenetet - Kulcs: %s, Érték: %s\n", string(key), string(value))
+			time.Sleep(50 * time.Millisecond)
+			return nil
+		})
+	}()
 
 	app := &App{
 		KubeClient:    kc,
@@ -75,9 +84,7 @@ func main() {
 		WsMutex:       &sync.Mutex{},
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go mykafka.ConsumeMessages(ctx, app.messageHandler)
+	//go mykafka.ConsumeMessages(ctx, app.messageHandler)
 
 	http.HandleFunc("/", app.uploadFile)
 	http.HandleFunc("/lists", listFiles)
@@ -154,14 +161,17 @@ func (a *App) uploadFile(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "File uploaded but failed to start processing job.", http.StatusInternalServerError)
 			return
 		}
-		/*
-			message := map[string]string{"image_url": "/files/" + header.Filename}
-			messageJSON, _ := json.Marshal(message)*/
-		//err = a.MyKafka.SendMessage(context.Background(), []byte(header.Filename), []byte(messageJSON))
-		a.MyKafka.TestSendMessage(context.Background())
+
+		message := map[string]string{"image_url": "/files/" + header.Filename}
+		messageJSON, _ := json.Marshal(message)
+		err = a.MyKafka.SendMessage(context.Background(), []byte(header.Filename), []byte(messageJSON))
 		if err != nil {
-			log.Printf("Failed to send Kafka message for file '%s': %+v", header.Filename, err)
+			log.Printf("asdasd")
 		}
+		// a.MyKafka.TestSendMessage(context.Background())
+		// if err != nil {
+		// 	log.Printf("Failed to send Kafka message for file '%s': %+v", header.Filename, err)
+		// }
 		w.Write([]byte("File uploaded successfully!"))
 	} else {
 		http.ServeFile(w, r, "static/login.html")
