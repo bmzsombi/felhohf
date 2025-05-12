@@ -43,11 +43,11 @@
                 const message = JSON.parse(event.data);
                 let notificationText = "";
                 if (message.image_url) {
-                    notificationText = "Új kép töltődött fel: " + message.image_url;
+                    notificationText = "Új kép töltődött fel: " + message.message;
                 } else if (message.message) {
                     notificationText = message.message;
                 } else {
-                    notificationText = "Új üzenet érkezett: " + event.data;
+                    notificationText = "Új üzenet érkezett: " + event.message;
                 }
 
                 notificationPopup.textContent = notificationText;
